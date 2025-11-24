@@ -576,6 +576,23 @@ button:active {
 }
 
 @media (max-width: 640px) {
+  .page {
+    padding: 24px 12px 48px;
+  }
+
+  .card {
+    padding: 20px 16px;
+  }
+
+  .todo-list {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .todo-card {
+    padding: 14px 12px;
+  }
+
   .grid, .edit-form .inline-grid {
     grid-template-columns: 1fr;
   }
