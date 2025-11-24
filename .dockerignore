@@ -1,4 +1,8 @@
 node_modules
 npm-debug.log*
-.DS_Store
+*.log
+.git
+.gitignore
+Dockerfile
 data/todos.json
+
