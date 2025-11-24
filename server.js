@@ -2,21 +2,76 @@ const express = require('express');
 const path = require('path');
 const fs = require('fs/promises');
 const { randomUUID } = require('crypto');
+const { Blob } = require('buffer');
 
 const app = express();
 const PORT = process.env.PORT || 3000;
 const DATA_FILE = path.join(__dirname, 'data', 'todos.json');
 
+const HF_TOKEN = process.env.HF_TOKEN;
+const HF_REPO_ID = process.env.HF_REPO_ID || process.env.SPACE_ID;
+const HF_REPO_TYPE = process.env.HF_REPO_TYPE || 'space'; // 'model' | 'dataset' | 'space'
+const HF_REPO_FILE = process.env.HF_REPO_FILE || 'data/todos.json';
+const USE_HF_HUB = Boolean(HF_TOKEN && HF_REPO_ID);
+
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
-async function readTodos() {
+async function loadHubModule() {
+  // Dynamic import so this file can stay CommonJS.
+  const hub = await import('@huggingface/hub');
+  return hub;
+}
+
+async function readTodosFromHub() {
+  const { downloadFile } = await loadHubModule();
+  const repo = { type: HF_REPO_TYPE, name: HF_REPO_ID };
+
+  try {
+    const response = await downloadFile({
+      repo,
+      path: HF_REPO_FILE,
+      accessToken: HF_TOKEN,
+    });
+    const raw = await response.text();
+    return JSON.parse(raw);
+  } catch (err) {
+    // If the file does not exist on Hub yet, treat as empty list.
+    if (err && (err.status === 404 || err.response?.status === 404)) {
+      return [];
+    }
+    console.error('Failed to read todos from Hub, falling back to local file', err);
+    throw err;
+  }
+}
+
+async function writeTodosToHub(todos) {
+  const { uploadFiles } = await loadHubModule();
+  const repo = { type: HF_REPO_TYPE, name: HF_REPO_ID };
+  const json = JSON.stringify(todos, null, 2);
+
+  // Blob is available in recent Node versions (including Spaces Node runtimes).
+  const content = new Blob([json], { type: 'application/json' });
+
+  await uploadFiles({
+    repo,
+    accessToken: HF_TOKEN,
+    files: [
+      {
+        path: HF_REPO_FILE,
+        content,
+      },
+    ],
+    commitMessage: 'Update todos.json from TODO list app',
+  });
+}
+
+async function readTodosFromLocal() {
   try {
     const raw = await fs.readFile(DATA_FILE, 'utf8');
     return JSON.parse(raw);
   } catch (err) {
     if (err.code === 'ENOENT') {
-      await writeTodos([]);
       return [];
     }
     throw err;
@@ -24,7 +79,28 @@ async function readTodos() {
 }
 
 async function writeTodos(todos) {
+  // Prefer persisting to Hugging Face Hub when configured.
+  if (USE_HF_HUB) {
+    try {
+      await writeTodosToHub(todos);
+      return;
+    } catch (err) {
+      console.error('Failed to write todos to Hub, falling back to local file', err);
+    }
+  }
+
   await fs.writeFile(DATA_FILE, JSON.stringify(todos, null, 2), 'utf8');
+}
+
+async function readTodos() {
+  if (USE_HF_HUB) {
+    try {
+      return await readTodosFromHub();
+    } catch (err) {
+      // Logged inside readTodosFromHub; fall through to local.
+    }
+  }
+  return readTodosFromLocal();
 }
 
 app.get('/api/todos', async (req, res) => {
