@@ -3,22 +3,22 @@
    ═══════════════════════════════════════════════════════════════ */
 
 :root {
-  /* Dark Mode Palette - Deep Space */
-  --bg-primary: #121216; /* 提亮背景，不再是纯黑 */
-  --bg-secondary: #1e1e24;
-  --bg-tertiary: #2a2a32;
+  /* Dark Mode Palette - Deep Green */
+  --bg-primary: #050f0b;
+  --bg-secondary: #071814;
+  --bg-tertiary: #0b221b;
   
-  /* Glass Effects - Refined */
-  --glass-bg: rgba(35, 35, 45, 0.6); /* 更通透的蓝灰色调 */
+  /* Glass Effects - Refined (slightly greenish) */
+  --glass-bg: rgba(20, 34, 28, 0.7);
   --glass-border: rgba(255, 255, 255, 0.1);
   --glass-highlight: rgba(255, 255, 255, 0.06);
   --glass-shine: rgba(255, 255, 255, 0.03);
   
   /* Accent Colors - Vivid & Neon */
-  --accent: #0a84ff;
-  --accent-hover: #409cff;
-  --accent-glow: rgba(10, 132, 255, 0.4);
-  --accent-dim: rgba(10, 132, 255, 0.1);
+  --accent: #22c55e;
+  --accent-hover: #16a34a;
+  --accent-glow: rgba(34, 197, 94, 0.45);
+  --accent-dim: rgba(34, 197, 94, 0.12);
   
   --green: #30d158;
   --green-glow: rgba(48, 209, 88, 0.3);
