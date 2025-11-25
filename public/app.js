@@ -10,10 +10,17 @@ const groupModal = document.getElementById('groupModal');
 const closeGroupModalBtn = document.getElementById('closeGroupModalBtn');
 const cancelGroupBtn = document.getElementById('cancelGroupBtn');
 const groupForm = document.getElementById('groupForm');
+const confirmModal = document.getElementById('confirmModal');
+const confirmTitleText = document.getElementById('confirmTitleText');
+const confirmMessage = document.getElementById('confirmMessage');
+const confirmOkBtn = document.getElementById('confirmOkBtn');
+const confirmCancelBtn = document.getElementById('confirmCancelBtn');
+const confirmCloseBtn = document.getElementById('confirmCloseBtn');
 
 let todos = [];
 let activeGroup = 'all';
 let groups = [];
+let confirmResolve = null;
 
 const groupSelectCreate = createForm?.querySelector('select[name="group"]');
 const deadlineInputCreate = createForm?.querySelector('input[name="deadline"]');
@@ -25,6 +32,57 @@ const deadlineDisplay = document.getElementById('deadlineDisplay');
 const deadlineDisplayText = document.getElementById('deadlineDisplayText');
 const deadlineMenu = document.getElementById('deadlineMenu');
 const groupListEl = document.getElementById('groupList');
+
+function openConfirmDialog(options = {}) {
+  const { title, message, confirmText, cancelText } = options;
+
+  if (
+    !confirmModal ||
+    !confirmTitleText ||
+    !confirmMessage ||
+    !confirmOkBtn ||
+    !confirmCancelBtn
+  ) {
+    const fallbackMessage = message || '确定要执行当前操作吗？';
+    const ok = window.confirm(fallbackMessage);
+    return Promise.resolve(ok);
+  }
+
+  return new Promise((resolve) => {
+    confirmResolve = resolve;
+    confirmTitleText.textContent = title || '确认操作';
+    confirmMessage.textContent = message || '确定要执行当前操作吗？';
+    confirmOkBtn.innerHTML = `<i class="ri-check-line"></i> ${confirmText || '确定'}`;
+    confirmCancelBtn.textContent = cancelText || '取消';
+
+    confirmModal.classList.add('open');
+    confirmModal.setAttribute('aria-hidden', 'false');
+
+    setTimeout(() => {
+      confirmOkBtn.focus();
+    }, 20);
+  });
+}
+
+function closeConfirmDialog(result) {
+  if (!confirmModal) {
+    if (typeof confirmResolve === 'function') {
+      const resolve = confirmResolve;
+      confirmResolve = null;
+      resolve(Boolean(result));
+    }
+    return;
+  }
+
+  confirmModal.classList.remove('open');
+  confirmModal.setAttribute('aria-hidden', 'true');
+
+  if (typeof confirmResolve === 'function') {
+    const resolve = confirmResolve;
+    confirmResolve = null;
+    resolve(Boolean(result));
+  }
+}
 
 function getGroups() {
   const set = new Set(groups || []);
@@ -176,6 +234,19 @@ closeGroupModalBtn?.addEventListener('click', closeGroupModal);
 cancelGroupBtn?.addEventListener('click', closeGroupModal);
 groupModal?.addEventListener('click', (e) => {
   if (e.target === groupModal) closeGroupModal();
+});
+
+confirmOkBtn?.addEventListener('click', () => closeConfirmDialog(true));
+confirmCancelBtn?.addEventListener('click', () => closeConfirmDialog(false));
+confirmCloseBtn?.addEventListener('click', () => closeConfirmDialog(false));
+confirmModal?.addEventListener('click', (e) => {
+  if (e.target === confirmModal) closeConfirmDialog(false);
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && confirmModal?.classList.contains('open')) {
+    e.preventDefault();
+    closeConfirmDialog(false);
+  }
 });
 
 function syncCreateDeadlineVisibility() {
@@ -647,7 +718,13 @@ async function handleUpdate(id, updates) {
 }
 
 async function handleDelete(id) {
-  if (!confirm('确定要删除这个待办吗？')) return;
+  const ok = await openConfirmDialog({
+    title: '删除任务',
+    message: '确定要删除这个待办吗？此操作无法撤销。',
+    confirmText: '删除',
+    cancelText: '保留',
+  });
+  if (!ok) return;
   try {
     setStatus('删除中...');
     const res = await API.remove(id);
@@ -728,7 +805,13 @@ groupForm?.addEventListener('submit', handleCreateGroupSubmit);
 
 async function handleDeleteGroup(name) {
   if (!name) return;
-  if (!window.confirm(`确定删除分组「${name}」吗？此分组下的任务将变为「不分组」。`)) return;
+  const ok = await openConfirmDialog({
+    title: '删除分组',
+    message: `确定删除分组「${name}」吗？此分组下的任务将变为「不分组」。`,
+    confirmText: '删除分组',
+    cancelText: '取消',
+  });
+  if (!ok) return;
   try {
     setStatus('正在删除分组...');
     const data = await API.deleteGroup(name);

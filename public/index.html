@@ -169,6 +169,30 @@
       </div>
     </div>
 
+    <!-- Confirm Dialog Modal -->
+    <div class="modal" id="confirmModal" aria-hidden="true">
+      <div class="modal-content card confirm-modal">
+        <div class="modal-head">
+          <h2>
+            <i class="ri-alert-line"></i>
+            <span id="confirmTitleText">确认操作</span>
+          </h2>
+          <button type="button" class="icon-btn" id="confirmCloseBtn" aria-label="关闭">
+            <i class="ri-close-line"></i>
+          </button>
+        </div>
+        <p class="muted" id="confirmMessage" style="margin-bottom: 16px;">
+          确定要执行当前操作吗？
+        </p>
+        <div class="actions">
+          <button type="button" class="primary" id="confirmOkBtn">
+            <i class="ri-check-line"></i> 确定
+          </button>
+          <button type="button" class="ghost" id="confirmCancelBtn">取消</button>
+        </div>
+      </div>
+    </div>
+
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
     <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/zh.js"></script>

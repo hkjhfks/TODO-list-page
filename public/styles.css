@@ -754,6 +754,21 @@ input:focus, textarea:focus, select:focus {
   animation: modalSlideUp 0.5s var(--ease-spring);
 }
 
+.confirm-modal .modal-head h2 i {
+  color: var(--red);
+  filter: drop-shadow(0 0 12px rgba(255, 69, 58, 0.6));
+}
+
+.confirm-modal .primary {
+  background: var(--red);
+  box-shadow: 0 4px 20px rgba(255, 69, 58, 0.45);
+}
+
+.confirm-modal .primary:hover {
+  background: #ff3b30;
+  box-shadow: 0 8px 32px rgba(255, 69, 58, 0.6);
+}
+
 @keyframes modalSlideUp {
   from { 
     opacity: 0;
