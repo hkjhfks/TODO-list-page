@@ -2,16 +2,19 @@
 <html lang="zh-CN">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>待办清单 · TODO List</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#000000" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <title>TODO · 待办清单</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
     <div class="gradient"></div>
+    
     <main class="page">
       <header class="hero">
         <div class="hero-content">
@@ -20,28 +23,28 @@
               <i class="ri-checkbox-multiple-fill"></i>
             </div>
             <div>
-              <p class="eyebrow">轻量但有记忆的待办</p>
+              <p class="eyebrow">轻量 · 优雅 · 持久化</p>
               <h1>TODO List</h1>
             </div>
           </div>
         </div>
         <div class="hero-meta">
-          <div class="pill"><i class="ri-database-2-line"></i> 后端存储</div>
-          <div class="pill accent"><i class="ri-magic-line"></i> 可添加备注 & 网址</div>
+          <div class="pill"><i class="ri-cloud-line"></i> 云端同步</div>
+          <div class="pill accent"><i class="ri-sparkling-line"></i> 智能分组</div>
         </div>
       </header>
 
       <section class="card list-card">
         <div class="card-head">
           <div class="head-text">
-            <h2><i class="ri-list-check"></i> 待办列表</h2>
-            <p class="muted">支持编辑、完成、删除；带网址的待办可一键打开。</p>
+            <h2><i class="ri-task-line"></i> 我的待办</h2>
+            <p class="muted">点击卡片编辑，拖拽排序，轻松管理每一天</p>
           </div>
           <div class="head-actions">
             <button type="button" class="ghost compact" id="createGroupBtn">
               <i class="ri-folder-add-line"></i> 新分组
             </button>
-            <button type="button" class="ghost compact" id="openModalBtn">
+            <button type="button" class="primary compact" id="openModalBtn">
               <i class="ri-add-line"></i> 新任务
             </button>
           </div>
@@ -50,90 +53,107 @@
       </section>
     </main>
 
+    <!-- Create Todo Modal -->
     <div class="modal" id="createModal" aria-hidden="true">
-      <div class="modal-content card create-card">
+      <div class="modal-content card">
         <div class="modal-head">
-          <h2><i class="ri-add-circle-line"></i> 添加待办</h2>
+          <h2><i class="ri-add-circle-line"></i> 新建待办</h2>
           <button type="button" class="icon-btn" id="closeModalBtn" aria-label="关闭">
             <i class="ri-close-line"></i>
           </button>
         </div>
-        <p class="muted">标题必填，备注和网址随意补充。</p>
+        <p class="muted" style="margin-bottom: 20px;">记录你的想法，让每一件事都有迹可循</p>
+        
         <form id="createForm" class="stack">
           <label class="field">
             <span>标题 <span class="required">*</span></span>
             <div class="input-wrapper">
-              <i class="ri-h-1"></i>
-              <input type="text" name="title" placeholder="今天要完成什么？" required />
+              <i class="ri-edit-2-line"></i>
+              <input type="text" name="title" placeholder="今天要完成什么？" required autocomplete="off" />
             </div>
           </label>
+          
           <div class="grid">
             <label class="field">
               <span>备注</span>
               <div class="input-wrapper">
-                <i class="ri-sticky-note-line"></i>
-                <textarea name="note" rows="1" placeholder="简短说明或记录进度"></textarea>
+                <i class="ri-file-text-line"></i>
+                <textarea name="note" rows="2" placeholder="添加一些细节说明..."></textarea>
               </div>
             </label>
             <label class="field">
-              <span>网址</span>
+              <span>链接</span>
               <div class="input-wrapper">
                 <i class="ri-link"></i>
-                <input type="url" name="url" placeholder="https://example.com" />
+                <input type="url" name="url" placeholder="https://" />
               </div>
             </label>
           </div>
+          
           <div class="grid meta-grid">
             <label class="field">
               <span>分组</span>
               <div class="input-wrapper">
-                <i class="ri-folder-2-line"></i>
+                <i class="ri-folder-3-line"></i>
                 <select name="group">
                   <option value="">不分组</option>
                 </select>
               </div>
-              <p class="field-hint">选择“签到”为每日分组，其他分组建议设置截止日期。</p>
+              <p class="field-hint">「签到」分组无需截止日期</p>
             </label>
             <label class="field" data-role="deadline-field">
               <span>截止日期</span>
               <div class="input-wrapper">
-                <i class="ri-calendar-line"></i>
+                <i class="ri-calendar-event-line"></i>
                 <input type="date" name="deadline" />
               </div>
             </label>
           </div>
+          
           <div class="actions">
-            <button type="submit" class="primary"><i class="ri-add-line"></i> 添加任务</button>
-            <button type="reset" class="ghost" id="resetBtn"><i class="ri-eraser-line"></i> 清空</button>
-            <span class="status-text" id="statusText"><i class="ri-loader-4-line"></i> 准备就绪</span>
+            <button type="submit" class="primary">
+              <i class="ri-check-line"></i> 创建任务
+            </button>
+            <button type="reset" class="ghost" id="resetBtn">
+              <i class="ri-refresh-line"></i> 重置
+            </button>
+            <span class="status-text" id="statusText">
+              <i class="ri-checkbox-circle-line"></i> 准备就绪
+            </span>
           </div>
         </form>
       </div>
     </div>
+
+    <!-- Create Group Modal -->
     <div class="modal" id="groupModal" aria-hidden="true">
-      <div class="modal-content card create-card">
+      <div class="modal-content card">
         <div class="modal-head">
           <h2><i class="ri-folder-add-line"></i> 新建分组</h2>
-          <button type="button" class="icon-btn" id="closeGroupModalBtn" aria-label="关闭分组窗口">
+          <button type="button" class="icon-btn" id="closeGroupModalBtn" aria-label="关闭">
             <i class="ri-close-line"></i>
           </button>
         </div>
-        <p class="muted">为常用任务创建分组，例如「签到」「工作」「生活」。</p>
+        <p class="muted" style="margin-bottom: 20px;">为任务创建分类，让管理更有条理</p>
+        
         <form id="groupForm" class="stack">
           <label class="field">
             <span>分组名称 <span class="required">*</span></span>
             <div class="input-wrapper">
-              <i class="ri-folder-2-line"></i>
-              <input type="text" name="name" placeholder="例如：签到 / 工作 / 生活" required />
+              <i class="ri-price-tag-3-line"></i>
+              <input type="text" name="name" placeholder="例如：工作、学习、生活" required autocomplete="off" />
             </div>
           </label>
           <div class="actions">
-            <button type="submit" class="primary"><i class="ri-save-line"></i> 保存分组</button>
+            <button type="submit" class="primary">
+              <i class="ri-check-line"></i> 创建分组
+            </button>
             <button type="button" class="ghost" id="cancelGroupBtn">取消</button>
           </div>
         </form>
       </div>
     </div>
+
     <script src="/app.js" defer></script>
   </body>
 </html>
