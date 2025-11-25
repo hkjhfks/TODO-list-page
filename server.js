@@ -187,6 +187,29 @@ async function addGroup(name) {
   return groups;
 }
 
+async function removeGroup(name) {
+  const trimmed = (name || '').trim();
+  if (!trimmed || trimmed === '签到') {
+    return await readGroups();
+  }
+  let state;
+  try {
+    state = USE_HF_HUB ? await readStateFromHub() : await readStateFromLocal();
+  } catch {
+    state = { todos: [], groups: [] };
+  }
+
+  const groups = ensureDefaultGroups((state.groups || []).filter((g) => g !== trimmed));
+  const todos = (state.todos || []).map((t) =>
+    t && typeof t.group === 'string' && t.group.trim() === trimmed
+      ? { ...t, group: '' }
+      : t
+  );
+
+  await writeState({ ...state, groups, todos });
+  return groups;
+}
+
 app.get('/api/todos', async (req, res) => {
   try {
     const todos = await readTodos();
@@ -222,6 +245,23 @@ app.post('/api/groups', async (req, res) => {
     res.status(500).json({ error: 'Failed to create group' });
   }
 });
+
+app.delete('/api/groups/:name', async (req, res) => {
+  const rawName = req.params.name || '';
+  const name = decodeURIComponent(rawName);
+  if (!name || name === '签到') {
+    return res.status(400).json({ error: 'This group cannot be deleted' });
+  }
+
+  try {
+    const groups = await removeGroup(name);
+    res.status(200).json({ groups, deleted: name });
+  } catch (err) {
+    console.error('Failed to delete group', err);
+    res.status(500).json({ error: 'Failed to delete group' });
+  }
+}
+);
 
 app.post('/api/todos', async (req, res) => {
   const { title, note = '', url = '', group = '', deadline = '' } = req.body;

@@ -10,6 +10,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://cdn.jsdelivr.net/npm/remixicon@3.5.0/fonts/remixicon.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
     <link rel="stylesheet" href="/styles.css" />
   </head>
   <body>
@@ -93,19 +94,29 @@
           <div class="grid meta-grid">
             <label class="field">
               <span>分组</span>
-              <div class="input-wrapper">
+              <div class="input-wrapper pill-input-wrapper">
                 <i class="ri-folder-3-line"></i>
-                <select name="group">
+                <button type="button" class="pill-input-display" id="groupDisplay">
+                  <span id="groupDisplayText">不分组</span>
+                  <i class="ri-arrow-down-s-line caret"></i>
+                </button>
+                <select name="group" class="native-select-hidden">
                   <option value="">不分组</option>
                 </select>
+                <div class="picker-menu" id="groupMenu" aria-hidden="true"></div>
               </div>
               <p class="field-hint">「签到」分组无需截止日期</p>
             </label>
             <label class="field" data-role="deadline-field">
               <span>截止日期</span>
-              <div class="input-wrapper">
+              <div class="input-wrapper pill-input-wrapper">
                 <i class="ri-calendar-event-line"></i>
-                <input type="date" name="deadline" />
+                <button type="button" class="pill-input-display" id="deadlineDisplay">
+                  <span id="deadlineDisplayText">无截止日期</span>
+                  <i class="ri-arrow-down-s-line caret"></i>
+                </button>
+                <input type="hidden" name="deadline" />
+                <div class="picker-menu" id="deadlineMenu" aria-hidden="true"></div>
               </div>
             </label>
           </div>
@@ -151,9 +162,16 @@
             <button type="button" class="ghost" id="cancelGroupBtn">取消</button>
           </div>
         </form>
+
+        <div class="group-list" id="groupList">
+          <!-- 分组列表（可删除）由 JS 渲染 -->
+        </div>
       </div>
     </div>
 
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.6.0/dist/confetti.browser.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/zh.js"></script>
     <script src="/app.js" defer></script>
   </body>
 </html>
