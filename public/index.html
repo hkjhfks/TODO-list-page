@@ -37,9 +37,14 @@
             <h2><i class="ri-list-check"></i> 待办列表</h2>
             <p class="muted">支持编辑、完成、删除；带网址的待办可一键打开。</p>
           </div>
-          <button type="button" class="ghost compact" id="openModalBtn">
-            <i class="ri-add-line"></i> 新任务
-          </button>
+          <div class="head-actions">
+            <button type="button" class="ghost compact" id="createGroupBtn">
+              <i class="ri-folder-add-line"></i> 新分组
+            </button>
+            <button type="button" class="ghost compact" id="openModalBtn">
+              <i class="ri-add-line"></i> 新任务
+            </button>
+          </div>
         </div>
         <ul id="todoList" class="todo-list" aria-live="polite"></ul>
       </section>
@@ -78,10 +83,53 @@
               </div>
             </label>
           </div>
+          <div class="grid meta-grid">
+            <label class="field">
+              <span>分组</span>
+              <div class="input-wrapper">
+                <i class="ri-folder-2-line"></i>
+                <select name="group">
+                  <option value="">不分组</option>
+                </select>
+              </div>
+              <p class="field-hint">选择“签到”为每日分组，其他分组建议设置截止日期。</p>
+            </label>
+            <label class="field" data-role="deadline-field">
+              <span>截止日期</span>
+              <div class="input-wrapper">
+                <i class="ri-calendar-line"></i>
+                <input type="date" name="deadline" />
+              </div>
+            </label>
+          </div>
           <div class="actions">
             <button type="submit" class="primary"><i class="ri-add-line"></i> 添加任务</button>
             <button type="reset" class="ghost" id="resetBtn"><i class="ri-eraser-line"></i> 清空</button>
             <span class="status-text" id="statusText"><i class="ri-loader-4-line"></i> 准备就绪</span>
+          </div>
+        </form>
+      </div>
+    </div>
+    <div class="modal" id="groupModal" aria-hidden="true">
+      <div class="modal-content card create-card">
+        <div class="modal-head">
+          <h2><i class="ri-folder-add-line"></i> 新建分组</h2>
+          <button type="button" class="icon-btn" id="closeGroupModalBtn" aria-label="关闭分组窗口">
+            <i class="ri-close-line"></i>
+          </button>
+        </div>
+        <p class="muted">为常用任务创建分组，例如「签到」「工作」「生活」。</p>
+        <form id="groupForm" class="stack">
+          <label class="field">
+            <span>分组名称 <span class="required">*</span></span>
+            <div class="input-wrapper">
+              <i class="ri-folder-2-line"></i>
+              <input type="text" name="name" placeholder="例如：签到 / 工作 / 生活" required />
+            </div>
+          </label>
+          <div class="actions">
+            <button type="submit" class="primary"><i class="ri-save-line"></i> 保存分组</button>
+            <button type="button" class="ghost" id="cancelGroupBtn">取消</button>
           </div>
         </form>
       </div>

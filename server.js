@@ -17,13 +17,31 @@ const USE_HF_HUB = Boolean(HF_TOKEN && HF_REPO_ID);
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
+function normalizeState(raw) {
+  if (Array.isArray(raw)) {
+    return { todos: raw, groups: [] };
+  }
+  if (raw && typeof raw === 'object') {
+    const todos = Array.isArray(raw.todos) ? raw.todos : [];
+    const groups = Array.isArray(raw.groups) ? raw.groups : [];
+    return { todos, groups };
+  }
+  return { todos: [], groups: [] };
+}
+
+function ensureDefaultGroups(groups) {
+  const set = new Set(Array.isArray(groups) ? groups : []);
+  set.add('签到');
+  return Array.from(set);
+}
+
 async function loadHubModule() {
   // Dynamic import so this file can stay CommonJS.
   const hub = await import('@huggingface/hub');
   return hub;
 }
 
-async function readTodosFromHub() {
+async function readStateFromHub() {
   const { downloadFile } = await loadHubModule();
   const repo = { type: HF_REPO_TYPE, name: HF_REPO_ID };
 
@@ -34,21 +52,28 @@ async function readTodosFromHub() {
       accessToken: HF_TOKEN,
     });
     const raw = await response.text();
-    return JSON.parse(raw);
+    return normalizeState(JSON.parse(raw));
   } catch (err) {
     // If the file does not exist on Hub yet, treat as empty list.
     if (err && (err.status === 404 || err.response?.status === 404)) {
-      return [];
+      return { todos: [], groups: [] };
     }
-    console.error('Failed to read todos from Hub, falling back to local file', err);
+    console.error('Failed to read state from Hub, falling back to local file', err);
     throw err;
   }
 }
 
-async function writeTodosToHub(todos) {
+async function writeStateToHub(state) {
   const { uploadFiles } = await loadHubModule();
   const repo = { type: HF_REPO_TYPE, name: HF_REPO_ID };
-  const json = JSON.stringify(todos, null, 2);
+  const json = JSON.stringify(
+    {
+      todos: Array.isArray(state.todos) ? state.todos : [],
+      groups: ensureDefaultGroups(state.groups),
+    },
+    null,
+    2
+  );
 
   // Blob is available in recent Node versions (including Spaces Node runtimes).
   const content = new Blob([json], { type: 'application/json' });
@@ -66,41 +91,100 @@ async function writeTodosToHub(todos) {
   });
 }
 
-async function readTodosFromLocal() {
+async function readStateFromLocal() {
   try {
     const raw = await fs.readFile(DATA_FILE, 'utf8');
-    return JSON.parse(raw);
+    return normalizeState(JSON.parse(raw));
   } catch (err) {
     if (err.code === 'ENOENT') {
-      return [];
+      return { todos: [], groups: [] };
     }
     throw err;
   }
 }
 
-async function writeTodos(todos) {
+async function writeState(state) {
   // Prefer persisting to Hugging Face Hub when configured.
   if (USE_HF_HUB) {
     try {
-      await writeTodosToHub(todos);
+      await writeStateToHub(state);
       return;
     } catch (err) {
-      console.error('Failed to write todos to Hub, falling back to local file', err);
+      console.error('Failed to write state to Hub, falling back to local file', err);
     }
   }
 
-  await fs.writeFile(DATA_FILE, JSON.stringify(todos, null, 2), 'utf8');
+  const toWrite = {
+    todos: Array.isArray(state.todos) ? state.todos : [],
+    groups: ensureDefaultGroups(state.groups),
+  };
+  await fs.writeFile(DATA_FILE, JSON.stringify(toWrite, null, 2), 'utf8');
 }
 
 async function readTodos() {
   if (USE_HF_HUB) {
     try {
-      return await readTodosFromHub();
+      const state = await readStateFromHub();
+      return state.todos || [];
     } catch (err) {
-      // Logged inside readTodosFromHub; fall through to local.
+      // Logged inside readStateFromHub; fall through to local.
     }
   }
-  return readTodosFromLocal();
+  const state = await readStateFromLocal();
+  return state.todos || [];
+}
+
+async function writeTodos(nextTodos) {
+  let state;
+  try {
+    state = USE_HF_HUB ? await readStateFromHub() : await readStateFromLocal();
+  } catch {
+    state = { todos: [], groups: [] };
+  }
+  const baseGroups = new Set(ensureDefaultGroups(state.groups));
+  (nextTodos || []).forEach((t) => {
+    if (t && typeof t.group === 'string' && t.group.trim()) {
+      baseGroups.add(t.group.trim());
+    }
+  });
+  await writeState({ ...state, todos: nextTodos, groups: Array.from(baseGroups) });
+}
+
+async function readGroups() {
+  let state;
+  try {
+    state = USE_HF_HUB ? await readStateFromHub() : await readStateFromLocal();
+  } catch {
+    state = { todos: [], groups: [] };
+  }
+  let groups = state.groups;
+  if (!groups || !groups.length) {
+    const set = new Set();
+    (state.todos || []).forEach((t) => {
+      if (t && typeof t.group === 'string' && t.group.trim()) {
+        set.add(t.group.trim());
+      }
+    });
+    groups = Array.from(set);
+  }
+  return ensureDefaultGroups(groups);
+}
+
+async function addGroup(name) {
+  const trimmed = (name || '').trim();
+  if (!trimmed) return await readGroups();
+  let state;
+  try {
+    state = USE_HF_HUB ? await readStateFromHub() : await readStateFromLocal();
+  } catch {
+    state = { todos: [], groups: [] };
+  }
+  const groups = ensureDefaultGroups(state.groups);
+  if (!groups.includes(trimmed)) {
+    groups.push(trimmed);
+  }
+  await writeState({ ...state, groups });
+  return groups;
 }
 
 app.get('/api/todos', async (req, res) => {
@@ -113,19 +197,55 @@ app.get('/api/todos', async (req, res) => {
   }
 });
 
+app.get('/api/groups', async (req, res) => {
+  try {
+    const groups = await readGroups();
+    res.json({ groups });
+  } catch (err) {
+    console.error('Failed to read groups', err);
+    res.status(500).json({ error: 'Failed to load groups' });
+  }
+});
+
+app.post('/api/groups', async (req, res) => {
+  const { name } = req.body || {};
+  if (!name || typeof name !== 'string' || !name.trim()) {
+    return res.status(400).json({ error: 'Group name is required' });
+  }
+  const trimmed = name.trim();
+
+  try {
+    const groups = await addGroup(trimmed);
+    res.status(201).json({ groups, created: trimmed });
+  } catch (err) {
+    console.error('Failed to create group', err);
+    res.status(500).json({ error: 'Failed to create group' });
+  }
+});
+
 app.post('/api/todos', async (req, res) => {
-  const { title, note = '', url = '' } = req.body;
+  const { title, note = '', url = '', group = '', deadline = '' } = req.body;
   if (!title || typeof title !== 'string' || !title.trim()) {
     return res.status(400).json({ error: 'Title is required' });
   }
 
   try {
+    const normalizedGroup = typeof group === 'string' ? group.trim() : '';
+    const normalizedDeadline = typeof deadline === 'string' ? deadline.trim() : '';
+    const needsDeadline = normalizedGroup && normalizedGroup !== '签到';
+
+    if (needsDeadline && !normalizedDeadline) {
+      return res.status(400).json({ error: 'This group requires a deadline' });
+    }
+
     const todos = await readTodos();
     const todo = {
       id: randomUUID(),
       title: title.trim(),
       note: typeof note === 'string' ? note.trim() : '',
       url: typeof url === 'string' ? url.trim() : '',
+      group: normalizedGroup,
+      deadline: needsDeadline ? normalizedDeadline : '',
       completed: false,
       createdAt: new Date().toISOString(),
     };
@@ -152,6 +272,12 @@ app.patch('/api/todos/:id', async (req, res) => {
   if (typeof req.body.url === 'string') {
     updates.url = req.body.url.trim();
   }
+  if (typeof req.body.group === 'string') {
+    updates.group = req.body.group.trim();
+  }
+  if (typeof req.body.deadline === 'string') {
+    updates.deadline = req.body.deadline.trim();
+  }
   if (typeof req.body.completed === 'boolean') {
     updates.completed = req.body.completed;
   }
@@ -167,7 +293,21 @@ app.patch('/api/todos/:id', async (req, res) => {
       return res.status(404).json({ error: 'Todo not found' });
     }
 
-    todos[idx] = { ...todos[idx], ...updates };
+    const next = { ...todos[idx], ...updates };
+    const normalizedGroup = typeof next.group === 'string' ? next.group.trim() : '';
+    const needsDeadline = normalizedGroup && normalizedGroup !== '签到';
+    const normalizedDeadline = typeof next.deadline === 'string' ? next.deadline.trim() : '';
+
+    if (needsDeadline && !normalizedDeadline) {
+      return res.status(400).json({ error: 'This group requires a deadline' });
+    }
+
+    todos[idx] = {
+      ...next,
+      group: normalizedGroup,
+      deadline: needsDeadline ? normalizedDeadline : '',
+    };
+
     await writeTodos(todos);
     res.json({ todo: todos[idx] });
   } catch (err) {

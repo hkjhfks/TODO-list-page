@@ -5,8 +5,60 @@ const resetBtn = document.getElementById('resetBtn');
 const openModalBtn = document.getElementById('openModalBtn');
 const closeModalBtn = document.getElementById('closeModalBtn');
 const createModal = document.getElementById('createModal');
+const createGroupBtn = document.getElementById('createGroupBtn');
+const groupModal = document.getElementById('groupModal');
+const closeGroupModalBtn = document.getElementById('closeGroupModalBtn');
+const cancelGroupBtn = document.getElementById('cancelGroupBtn');
+const groupForm = document.getElementById('groupForm');
 
 let todos = [];
+let activeGroup = 'all';
+let groups = [];
+
+const groupSelectCreate = createForm?.querySelector('select[name="group"]');
+const deadlineInputCreate = createForm?.querySelector('input[name="deadline"]');
+const deadlineFieldCreate = createForm?.querySelector('[data-role="deadline-field"]');
+
+function getGroups() {
+  const set = new Set(groups || []);
+  return Array.from(set).sort((a, b) => a.localeCompare(b, 'zh-CN'));
+}
+
+function renderGroupOptions(selectEl, currentValue = '') {
+  if (!selectEl) return;
+  const current = (currentValue || '').trim();
+  const allGroups = getGroups();
+
+  selectEl.innerHTML = '';
+
+  const emptyOption = document.createElement('option');
+  emptyOption.value = '';
+  emptyOption.textContent = '不分组';
+  selectEl.appendChild(emptyOption);
+
+  allGroups.forEach((name) => {
+    const opt = document.createElement('option');
+    opt.value = name;
+    opt.textContent = name;
+    if (name === current) opt.selected = true;
+    selectEl.appendChild(opt);
+  });
+
+  if (current && !allGroups.includes(current)) {
+    const opt = document.createElement('option');
+    opt.value = current;
+    opt.textContent = current;
+    opt.selected = true;
+    selectEl.appendChild(opt);
+  }
+}
+
+function createGroupSelect(currentValue = '') {
+  const select = document.createElement('select');
+  select.className = 'group-select';
+  renderGroupOptions(select, currentValue);
+  return select;
+}
 
 const API = {
   list: () => fetch('/api/todos').then((r) => r.json()),
@@ -26,6 +78,13 @@ const API = {
     fetch(`/api/todos/${id}`, {
       method: 'DELETE',
     }),
+  listGroups: () => fetch('/api/groups').then((r) => r.json()),
+  createGroup: (name) =>
+    fetch('/api/groups', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name }),
+    }).then((r) => r.json()),
 };
 
 function openCreateModal() {
@@ -48,6 +107,47 @@ createModal?.addEventListener('click', (e) => {
   if (e.target === createModal) closeCreateModal();
 });
 
+function openGroupModal() {
+  if (!groupModal) return;
+  groupModal.classList.add('open');
+  groupModal.setAttribute('aria-hidden', 'false');
+  const input = groupForm?.querySelector('input[name="name"]');
+  if (input) {
+    input.value = '';
+    setTimeout(() => input.focus(), 30);
+  }
+}
+
+function closeGroupModal() {
+  if (!groupModal) return;
+  groupModal.classList.remove('open');
+  groupModal.setAttribute('aria-hidden', 'true');
+}
+
+closeGroupModalBtn?.addEventListener('click', closeGroupModal);
+cancelGroupBtn?.addEventListener('click', closeGroupModal);
+groupModal?.addEventListener('click', (e) => {
+  if (e.target === groupModal) closeGroupModal();
+});
+
+function syncCreateDeadlineVisibility() {
+  if (!groupSelectCreate || !deadlineInputCreate || !deadlineFieldCreate) return;
+  const name = (groupSelectCreate.value || '').trim();
+  const isCheckin = name === '签到';
+  const needsDeadline = name && !isCheckin;
+
+  deadlineInputCreate.required = Boolean(needsDeadline);
+
+  if (isCheckin) {
+    deadlineInputCreate.value = '';
+    deadlineFieldCreate.classList.add('hidden');
+  } else {
+    deadlineFieldCreate.classList.remove('hidden');
+  }
+}
+
+groupSelectCreate?.addEventListener('change', syncCreateDeadlineVisibility);
+
 function setStatus(message, tone = 'muted') {
   const icon = tone === 'ok' ? 'ri-check-line' : tone === 'warn' ? 'ri-error-warning-line' : 'ri-loader-4-line';
   statusText.innerHTML = `<i class="${icon}"></i> ${message}`;
@@ -61,10 +161,52 @@ function createBadge(label, iconClass, extraClass = '') {
   return badge;
 }
 
+function renderGroupFilter() {
+  let filterBar = document.getElementById('groupFilterBar');
+  if (!filterBar) {
+    filterBar = document.createElement('div');
+    filterBar.id = 'groupFilterBar';
+    filterBar.className = 'group-filter';
+    listEl.parentElement.insertBefore(filterBar, listEl);
+  }
+
+  const groups = getGroups();
+  filterBar.innerHTML = '';
+
+  const allBtn = document.createElement('button');
+  allBtn.type = 'button';
+  allBtn.className = `chip ${activeGroup === 'all' ? 'chip-active' : ''}`;
+  allBtn.textContent = '全部';
+  allBtn.addEventListener('click', () => {
+    activeGroup = 'all';
+    renderTodos();
+  });
+  filterBar.appendChild(allBtn);
+
+  getGroups().forEach((group) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = `chip ${activeGroup === group ? 'chip-active' : ''}`;
+    btn.textContent = group;
+    btn.addEventListener('click', () => {
+      activeGroup = group;
+      renderTodos();
+    });
+    filterBar.appendChild(btn);
+  });
+}
+
 function renderTodos() {
   listEl.innerHTML = '';
 
-  if (!todos.length) {
+  renderGroupFilter();
+
+  const visibleTodos =
+    activeGroup === 'all'
+      ? todos
+      : todos.filter((t) => (t.group || '').trim() === activeGroup);
+
+  if (!visibleTodos.length) {
     const empty = document.createElement('li');
     empty.className = 'empty';
     empty.innerHTML = `<i class="ri-inbox-line"></i><p>暂无待办，开始添加吧。</p>`;
@@ -72,7 +214,7 @@ function renderTodos() {
     return;
   }
 
-  todos.forEach((todo) => {
+  visibleTodos.forEach((todo) => {
     const item = document.createElement('li');
     item.className = `todo-card${todo.completed ? ' completed' : ''}`;
 
@@ -91,6 +233,7 @@ function renderTodos() {
     if (todo.completed) meta.appendChild(createBadge('已完成', 'ri-checkbox-circle-line', 'done'));
     if (todo.url) meta.appendChild(createBadge('含网址', 'ri-link', 'link'));
     if (todo.note) meta.appendChild(createBadge('有备注', 'ri-sticky-note-line'));
+    if (todo.group) meta.appendChild(createBadge(todo.group, 'ri-folder-2-line'));
 
     titleWrap.appendChild(title);
     titleWrap.appendChild(meta);
@@ -125,6 +268,14 @@ function renderTodos() {
       note.className = 'note';
       note.textContent = todo.note;
       contentWrap.appendChild(note);
+    }
+
+    const isCheckin = (todo.group || '').trim() === '签到';
+    if (todo.deadline && !isCheckin) {
+      const deadline = document.createElement('p');
+      deadline.className = 'deadline';
+      deadline.textContent = `截止日期：${todo.deadline}`;
+      contentWrap.appendChild(deadline);
     }
 
     if (todo.url) {
@@ -177,6 +328,12 @@ function buildEditForm(todo, onDone) {
   noteInput.value = todo.note || '';
   noteInput.placeholder = '备注';
 
+  const groupSelect = createGroupSelect(todo.group || '');
+
+  const deadlineInput = document.createElement('input');
+  deadlineInput.type = 'date';
+  deadlineInput.value = todo.deadline || '';
+
   const inlineGrid = document.createElement('div');
   inlineGrid.className = 'inline-grid';
 
@@ -209,7 +366,23 @@ function buildEditForm(todo, onDone) {
   cancelBtn.innerHTML = '取消';
 
   formActions.append(saveBtn, cancelBtn);
-  form.append(titleInput, noteInput, inlineGrid, formActions);
+  form.append(titleInput, noteInput, groupSelect, deadlineInput, inlineGrid, formActions);
+
+  function syncEditDeadlineVisibility() {
+    const name = (groupSelect.value || '').trim();
+    const isCheckin = name === '签到';
+    const needsDeadline = name && !isCheckin;
+    deadlineInput.required = Boolean(needsDeadline);
+    if (isCheckin) {
+      deadlineInput.value = '';
+      deadlineInput.classList.add('hidden');
+    } else {
+      deadlineInput.classList.remove('hidden');
+    }
+  }
+
+  groupSelect.addEventListener('change', syncEditDeadlineVisibility);
+  syncEditDeadlineVisibility();
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
@@ -217,6 +390,8 @@ function buildEditForm(todo, onDone) {
       title: titleInput.value,
       note: noteInput.value,
       url: urlInput.value,
+      group: groupSelect.value,
+      deadline: deadlineInput.value,
       completed: completedToggle.checked,
     });
     onDone();
@@ -267,6 +442,8 @@ createForm.addEventListener('submit', async (e) => {
     title: formData.get('title').trim(),
     note: formData.get('note').trim(),
     url: formData.get('url').trim(),
+    group: (formData.get('group') || '').toString().trim(),
+    deadline: (formData.get('deadline') || '').toString().trim(),
   };
 
   if (!payload.title) {
@@ -293,11 +470,43 @@ resetBtn.addEventListener('click', () => {
   setStatus('表单已清空');
 });
 
+async function handleCreateGroupSubmit(e) {
+  e?.preventDefault();
+  const input = groupForm?.querySelector('input[name="name"]');
+  if (!input) return;
+  const trimmed = input.value.trim();
+  if (!trimmed) {
+    setStatus('分组名称不能为空', 'warn');
+    return;
+  }
+
+  try {
+    setStatus('正在创建分组...');
+    const data = await API.createGroup(trimmed);
+    if (!data.groups) throw new Error(data.error || '创建分组失败');
+    groups = data.groups || [];
+    renderGroupOptions(groupSelectCreate, trimmed);
+    syncCreateDeadlineVisibility();
+    renderTodos();
+    setStatus('分组已创建 ✓', 'ok');
+    closeGroupModal();
+  } catch (err) {
+    console.error(err);
+    setStatus(err.message || '创建分组失败', 'warn');
+  }
+}
+
+createGroupBtn?.addEventListener('click', openGroupModal);
+groupForm?.addEventListener('submit', handleCreateGroupSubmit);
+
 async function init() {
   try {
-    const data = await API.list();
-    todos = data.todos || [];
+    const [todoData, groupData] = await Promise.all([API.list(), API.listGroups()]);
+    todos = todoData.todos || [];
+    groups = groupData.groups || [];
+    renderGroupOptions(groupSelectCreate, '');
     renderTodos();
+    syncCreateDeadlineVisibility();
     setStatus('已连接后端 ✓', 'ok');
   } catch (err) {
     console.error(err);
