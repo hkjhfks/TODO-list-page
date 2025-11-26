@@ -286,7 +286,13 @@ function createBadge(label, iconClass, extraClass = '') {
 
 function formatDate(d) {
   if (!(d instanceof Date) || Number.isNaN(d.getTime())) return '';
-  return d.toISOString().slice(0, 10);
+  // 固定使用北京时间（UTC+8）来计算日期，而不是浏览器所在时区或纯 UTC
+  const utcTime = d.getTime() + d.getTimezoneOffset() * 60000;
+  const beijing = new Date(utcTime + 8 * 60 * 60000);
+  const year = beijing.getUTCFullYear();
+  const month = String(beijing.getUTCMonth() + 1).padStart(2, '0');
+  const day = String(beijing.getUTCDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
 }
 
 function updateDeadlineDisplayFromValue(value) {
