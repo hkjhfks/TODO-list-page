@@ -98,7 +98,7 @@ function renderGroupOptions(selectEl, currentValue = '') {
 
   const emptyOption = document.createElement('option');
   emptyOption.value = '';
-  emptyOption.textContent = '不分组';
+  emptyOption.textContent = '请选择分组';
   selectEl.appendChild(emptyOption);
 
   allGroups.forEach((name) => {
@@ -142,11 +142,11 @@ function updateGroupMenu(currentValue = '') {
     btn.type = 'button';
     btn.className = 'picker-item';
     if ((value || '') === current) btn.classList.add('picker-item-active');
-    btn.textContent = value || '不分组';
+    btn.textContent = value || '请选择分组';
     btn.addEventListener('click', () => {
       groupSelectCreate.value = value;
       if (groupDisplayText) {
-        groupDisplayText.textContent = value || '不分组';
+        groupDisplayText.textContent = value || '请选择分组';
       }
       syncCreateDeadlineVisibility();
       groupMenu.classList.remove('open');
@@ -428,15 +428,59 @@ function renderGroupFilter() {
   });
 }
 
+function normalizeGroupName(todo) {
+  return (todo.group || '').trim();
+}
+
+function hasDeadline(todo) {
+  return Boolean((todo.deadline || '').trim());
+}
+
+function sortTodosByDeadline(list) {
+  const cloned = list.slice();
+  cloned.sort((a, b) => {
+    const da = (a.deadline || '').trim();
+    const db = (b.deadline || '').trim();
+    const hasA = Boolean(da);
+    const hasB = Boolean(db);
+
+    if (!hasA && !hasB) return 0;
+    if (!hasA) return 1; // 无截止时间的排在有截止时间之后
+    if (!hasB) return -1;
+
+    if (da < db) return -1;
+    if (da > db) return 1;
+
+    const ca = (a.createdAt || '').trim();
+    const cb = (b.createdAt || '').trim();
+    if (ca && cb) {
+      if (ca < cb) return -1;
+      if (ca > cb) return 1;
+    }
+    return 0;
+  });
+  return cloned;
+}
+
 function renderTodos() {
   listEl.innerHTML = '';
 
   renderGroupFilter();
 
+  let baseTodos;
+  if (activeGroup === 'all') {
+    // 「全部」视图中：不显示没有截止时间的「签到」任务
+    baseTodos = todos.filter((t) => {
+      const groupName = normalizeGroupName(t);
+      if (groupName === '签到' && !hasDeadline(t)) return false;
+      return true;
+    });
+  } else {
+    baseTodos = todos.filter((t) => normalizeGroupName(t) === activeGroup);
+  }
+
   const visibleTodos =
-    activeGroup === 'all'
-      ? todos
-      : todos.filter((t) => (t.group || '').trim() === activeGroup);
+    activeGroup === '签到' ? baseTodos : sortTodosByDeadline(baseTodos);
 
   if (!visibleTodos.length) {
     const empty = document.createElement('li');
@@ -640,11 +684,16 @@ function buildEditForm(todo, onDone) {
 
   form.addEventListener('submit', async (e) => {
     e.preventDefault();
+    const trimmedGroup = (groupSelect.value || '').trim();
+    if (!trimmedGroup) {
+      setStatus('分组不能为空', 'warn');
+      return;
+    }
     await handleUpdate(todo.id, {
       title: titleInput.value,
       note: noteInput.value,
       url: urlInput.value,
-      group: groupSelect.value,
+      group: trimmedGroup,
       deadline: deadlineInput.value,
       completed: completedToggle.checked,
     });
@@ -754,6 +803,11 @@ createForm.addEventListener('submit', async (e) => {
     return;
   }
 
+  if (!payload.group) {
+    setStatus('分组不能为空', 'warn');
+    return;
+  }
+
   try {
     setStatus('保存中...');
     const data = await API.create(payload);
@@ -807,7 +861,7 @@ async function handleDeleteGroup(name) {
   if (!name) return;
   const ok = await openConfirmDialog({
     title: '删除分组',
-    message: `确定删除分组「${name}」吗？此分组下的任务将变为「不分组」。`,
+    message: `确定删除分组「${name}」吗？此分组下的任务将失去分组，需要重新选择分组。`,
     confirmText: '删除分组',
     cancelText: '取消',
   });
@@ -823,7 +877,7 @@ async function handleDeleteGroup(name) {
       groupSelectCreate.value = '';
     }
     if (groupDisplayText) {
-      groupDisplayText.textContent = '不分组';
+      groupDisplayText.textContent = '请选择分组';
     }
     renderGroupListForManage();
     if (wasActive) {
